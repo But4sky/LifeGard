@@ -224,7 +224,7 @@
   <div class="input-section">
     <div class="input-group">
       <label>出生日期</label>
-      <input type="date" id="birthdate">
+      <input type="date" id="birthdate" min="1900-01-01" max="2099-12-31">
     </div>
     <div class="input-group">
       <label>计算日期（今天）</label>
@@ -272,6 +272,29 @@
     // 设置默认日期为今天
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('targetdate').value = today;
+
+    // 限制出生日期年份为4位数字
+    const birthdateInput = document.getElementById('birthdate');
+    birthdateInput.addEventListener('input', function(e) {
+      const value = this.value;
+      // 如果输入的长度超过10位（YYYY-MM-DD），截断
+      if (value.length > 10) {
+        this.value = value.slice(0, 10);
+      }
+      // 验证年份部分是否为4位
+      const yearMatch = value.match(/^\d{4}/);
+      if (yearMatch && yearMatch[0].length > 4) {
+        this.value = value.slice(0, 4);
+      }
+    });
+
+    birthdateInput.addEventListener('blur', function() {
+      const value = this.value;
+      // 如果年份不足4位，清空或提示
+      if (value && value.length < 4) {
+        this.value = '';
+      }
+    });
 
     function calculate() {
       const birthStr = document.getElementById('birthdate').value;
