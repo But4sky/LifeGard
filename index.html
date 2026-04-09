@@ -22,6 +22,68 @@
       padding: 40px 20px;
     }
 
+    /* Auth header */
+    .auth-header {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      z-index: 100;
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .user-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .user-name {
+      font-size: 0.9rem;
+      color: #666;
+    }
+
+    .btn-auth {
+      background: #fff;
+      color: #333;
+      border: 2px solid #ccc;
+      padding: 8px 20px;
+      font-size: 0.9rem;
+      border-radius: 20px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-auth:hover {
+      background: #f5f5f5;
+      border-color: #999;
+    }
+
+    .btn-auth.google {
+      background: #fff;
+    }
+
+    .btn-auth.google:hover {
+      background: #f8f8f8;
+    }
+
+    .btn-auth.logout {
+      background: #f5f5f5;
+      color: #666;
+    }
+
     h1 {
       font-size: 2rem;
       font-weight: 300;
@@ -198,6 +260,33 @@
       font-size: 0.9rem;
     }
 
+    /* Loading spinner */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255,255,255,0.9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid #e0e0e0;
+      border-top-color: #333;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
     @media (max-width: 600px) {
       .grid {
         grid-template-columns: repeat(20, 1fr);
@@ -214,10 +303,27 @@
       .stat-value {
         font-size: 2rem;
       }
+
+      .auth-header {
+        top: 10px;
+        right: 10px;
+      }
+
+      .user-name {
+        display: none;
+      }
     }
   </style>
 </head>
 <body>
+  <!-- Auth Header -->
+  <div class="auth-header" id="authHeader">
+    <div id="loadingAuth" class="loading-overlay" style="display:none;">
+      <div class="spinner"></div>
+    </div>
+    <!-- Content injected by Firebase Auth -->
+  </div>
+
   <h1>LIFEGARD</h1>
   <p class="subtitle">人生格子 · 1200个月</p>
 
@@ -264,7 +370,90 @@
 
   <p class="message" id="message"></p>
 
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+
   <script>
+    // Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyAYgGfXEvWXHnpxmjsbn2XwdEpzMJs6GLg",
+      authDomain: "lifegard-auth.firebaseapp.com",
+      projectId: "lifegard-auth",
+      storageBucket: "lifegard-auth.firebasestorage.app",
+      messagingSenderId: "804376733967",
+      appId: "1:804376733967:web:6ac755a870afee837ab67a"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+
+    // Google provider
+    const googleProvider = new firebase.auth.GoogleAuthProvider();
+
+    // Render auth UI
+    function renderAuthUI() {
+      const authHeader = document.getElementById('authHeader');
+      auth.onAuthStateChanged(user => {
+        if (user) {
+          // Logged in
+          authHeader.innerHTML = `
+            <div class="user-info">
+              <img src="${user.photoURL || 'https://via.placeholder.com/36'}" alt="avatar" class="user-avatar">
+              <span class="user-name">${user.displayName || user.email}</span>
+            </div>
+            <button class="btn-auth logout" onclick="logout()">退出</button>
+          `;
+        } else {
+          // Not logged in
+          authHeader.innerHTML = `
+            <button class="btn-auth google" onclick="loginWithGoogle()">
+              <svg width="18" height="18" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+              使用 Google 登录
+            </button>
+          `;
+        }
+      });
+    }
+
+    // Login with Google
+    function loginWithGoogle() {
+      document.getElementById('loadingAuth').style.display = 'flex';
+      auth.signInWithPopup(googleProvider)
+        .then((result) => {
+          console.log('Login success:', result.user);
+        })
+        .catch((error) => {
+          console.error('Login error:', error);
+          alert('登录失败: ' + error.message);
+        })
+        .finally(() => {
+          document.getElementById('loadingAuth').style.display = 'none';
+        });
+    }
+
+    // Logout
+    function logout() {
+      auth.signOut()
+        .then(() => {
+          console.log('Logout success');
+        })
+        .catch((error) => {
+          console.error('Logout error:', error);
+        });
+    }
+
+    // Initialize auth UI
+    renderAuthUI();
+
+    // ==================== App Logic ====================
+
     const TOTAL_CELLS = 1200;
     const COLS = 40;
     const ROWS = 30;
@@ -277,11 +466,9 @@
     const birthdateInput = document.getElementById('birthdate');
     birthdateInput.addEventListener('input', function(e) {
       const value = this.value;
-      // 如果输入的长度超过10位（YYYY-MM-DD），截断
       if (value.length > 10) {
         this.value = value.slice(0, 10);
       }
-      // 验证年份部分是否为4位
       const yearMatch = value.match(/^\d{4}/);
       if (yearMatch && yearMatch[0].length > 4) {
         this.value = value.slice(0, 4);
@@ -290,7 +477,6 @@
 
     birthdateInput.addEventListener('blur', function() {
       const value = this.value;
-      // 如果年份不足4位，清空或提示
       if (value && value.length < 4) {
         this.value = '';
       }
@@ -313,21 +499,17 @@
         return;
       }
 
-      // 计算月份差
       const monthsUsed = (target.getFullYear() - birth.getFullYear()) * 12 
                         + (target.getMonth() - birth.getMonth());
       
-      // 确保至少是0
       const safeMonthsUsed = Math.max(0, Math.min(monthsUsed, TOTAL_CELLS));
       const monthsLeft = TOTAL_CELLS - safeMonthsUsed;
       const percentage = ((safeMonthsUsed / TOTAL_CELLS) * 100).toFixed(1);
 
-      // 更新统计
       document.getElementById('monthsUsed').textContent = safeMonthsUsed;
       document.getElementById('monthsLeft').textContent = monthsLeft;
       document.getElementById('percentage').textContent = percentage + '%';
 
-      // 渲染格子
       const grid = document.getElementById('grid');
       grid.innerHTML = '';
 
@@ -337,7 +519,6 @@
         grid.appendChild(cell);
       }
 
-      // 生命寄语
       const message = document.getElementById('message');
       if (safeMonthsUsed >= 800) {
         message.textContent = '余生不长，但每一天都是馈赠。';
@@ -348,19 +529,50 @@
       } else {
         message.textContent = '路还很长，但要开始认真了。';
       }
+
+      // Save to Firebase if logged in, otherwise localStorage
+      const user = auth.currentUser;
+      if (user) {
+        saveToFirebase(user.uid, birthStr);
+      } else {
+        localStorage.setItem('lifegard_birth', birthStr);
+      }
     }
 
-    // 页面加载时自动计算一次（如果有默认生日）
-    window.onload = function() {
-      // 如果用户之前填过，可以从 localStorage 恢复
-      const savedBirth = localStorage.getItem('lifegard_birth');
-      if (savedBirth) {
-        document.getElementById('birthdate').value = savedBirth;
-        calculate();
-      }
-    };
+    // Save to Firebase (you can extend this later)
+    function saveToFirebase(uid, birthdate) {
+      // Placeholder for future Firebase save functionality
+      console.log('User:', uid, 'Birthdate saved:', birthdate);
+    }
 
-    // 保存生日到 localStorage
+    // Load saved data
+    function loadSavedData() {
+      const user = auth.currentUser;
+      if (user) {
+        // If logged in, you could load from Firebase here
+        // For now, just use localStorage
+        const savedBirth = localStorage.getItem('lifegard_birth');
+        if (savedBirth) {
+          document.getElementById('birthdate').value = savedBirth;
+          calculate();
+        }
+      } else {
+        const savedBirth = localStorage.getItem('lifegard_birth');
+        if (savedBirth) {
+          document.getElementById('birthdate').value = savedBirth;
+          calculate();
+        }
+      }
+    }
+
+    // Listen for auth state changes
+    auth.onAuthStateChanged(user => {
+      loadSavedData();
+    });
+
+    // Initial load
+    window.onload = loadSavedData;
+
     document.getElementById('birthdate').addEventListener('change', function() {
       localStorage.setItem('lifegard_birth', this.value);
     });
